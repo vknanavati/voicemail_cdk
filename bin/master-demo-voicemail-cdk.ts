@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { VoicemailStack } from '../lib/voicemail-stack';
+import { VoicemailStack } from '../lib/master-demo-voicemail-cdk-stack';
 
 const app = new cdk.App();
 
