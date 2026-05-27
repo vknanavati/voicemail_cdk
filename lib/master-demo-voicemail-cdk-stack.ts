@@ -28,6 +28,9 @@ export class VoicemailStack extends cdk.Stack {
       transcriptionsFolder:        'transcriptions',
       taskTemplateId:              this.node.tryGetContext('taskTemplateId') ?? 'REPLACE_AFTER_FIRST_DEPLOY',
       vmx01FlowArn:                this.node.tryGetContext('vmx01FlowArn') ?? '',
+      basicQueueId: this.node.tryGetContext('basicQueueId'),
+beepPromptId:  this.node.tryGetContext('beepPromptId'),
+musicPromptId: this.node.tryGetContext('musicPromptId'),
       lambdaNames: {
         dumpToS3:   'master-demo-dump-to-s3',
         transcribe: 'master-demo-transcribe-recordings',
