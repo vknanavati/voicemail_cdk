@@ -12,50 +12,30 @@ import * as path from 'path';
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION — update these values before deploying
 // ─────────────────────────────────────────────────────────────────────────────
-const CONFIG = {
-  // Your existing Connect instance ID (us-west-2)
-  connectInstanceId: '095fb435-175a-4105-9e33-f22aad321d72',
-  connectInstanceArn: 'arn:aws:connect:us-west-2:308665918648:instance/095fb435-175a-4105-9e33-f22aad321d72',
-
-  // S3 bucket names
-  voicemailBucketName: 'vn-demo-voicemail-bucket',
-
-  // The Connect-managed recordings bucket (created by Connect automatically).
-  // Find this in Connect → Data storage → Call recordings.
-  // It follows the pattern: amazon-connect-<hash>
-  connectRecordingsBucketName: 'amazon-connect-REPLACE_WITH_YOUR_HASH',
-
-  // S3 folder paths inside the voicemail bucket
-  recordingsFolder: 'recordings',
-  transcriptionsFolder: 'transcriptions',
-
-  // DynamoDB table name for agent phone lookup
-  agentPhoneLookupTable: 'AgentPhoneLookup',
-
-  // Secrets Manager secret name for presigner IAM credentials
-  secretName: 'voicemail-presigner-credentials',
-
-  // Lambda function names (must match what your Connect flows invoke by name)
-  lambdaNames: {
-    dumpToS3:   'master-demo-dump-to-s3',
-    transcribe: 'master-demo-transcribe-recordings',
-    presigner:  'master-demo-presigner',
-    packager:   'master-demo-packager',
-  },
-
-  // The task template ID — fill in after first deploy (see README note below)
-  // You can find it in Connect → Task templates → VoicemailTemplate → URL
-  taskTemplateId: 'REPLACE_AFTER_FIRST_DEPLOY',
-
-  // Connect flow ARN for VMX_VN_01 (the task-creation flow)
-  // Find in Connect → Contact flows → VMX_VN_01 → Additional flow info
-  vmx01FlowArn: 'arn:aws:connect:us-west-2:308665918648:instance/095fb435-175a-4105-9e33-f22aad321d72/contact-flow/REPLACE_WITH_VMX01_FLOW_ID',
-};
-// ─────────────────────────────────────────────────────────────────────────────
-
 export class VoicemailStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // CONFIG goes here — after super(), this is now available
+    const CONFIG = {
+      connectInstanceId:           this.node.tryGetContext('connectInstanceId'),
+      connectInstanceArn:          `arn:aws:connect:${this.region}:${this.account}:instance/${this.node.tryGetContext('connectInstanceId')}`,
+      voicemailBucketName:         this.node.tryGetContext('voicemailBucketName'),
+      connectRecordingsBucketName: this.node.tryGetContext('connectRecordingsBucketName'),
+      agentPhoneLookupTable:       this.node.tryGetContext('agentPhoneLookupTable') ?? 'AgentPhoneLookup',
+      secretName:                  this.node.tryGetContext('secretName') ?? 'voicemail-presigner-credentials',
+      recordingsFolder:            'recordings',
+      transcriptionsFolder:        'transcriptions',
+      taskTemplateId:              this.node.tryGetContext('taskTemplateId') ?? 'REPLACE_AFTER_FIRST_DEPLOY',
+      vmx01FlowArn:                this.node.tryGetContext('vmx01FlowArn') ?? '',
+      lambdaNames: {
+        dumpToS3:   'master-demo-dump-to-s3',
+        transcribe: 'master-demo-transcribe-recordings',
+        presigner:  'master-demo-presigner',
+        packager:   'master-demo-packager',
+      },
+    };
+// ─────────────────────────────────────────────────────────────────────────────
 
     // ── 1. S3 BUCKET ──────────────────────────────────────────────────────────
     // Import the existing voicemail bucket rather than creating a new one,
@@ -97,7 +77,7 @@ export class VoicemailStack extends cdk.Stack {
             'logs:CreateLogStream',
             'logs:PutLogEvents',
           ],
-          resources: ['arn:aws:logs:us-west-2:308665918648:log-group:/aws/lambda/*'],
+          resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/*`]
         }),
       ],
     });
@@ -200,7 +180,7 @@ export class VoicemailStack extends cdk.Stack {
       sid: 'InvokePresigner',
       effect: iam.Effect.ALLOW,
       actions: ['lambda:InvokeFunction'],
-      resources: [`arn:aws:lambda:us-west-2:308665918648:function:${CONFIG.lambdaNames.presigner}`],
+      resources: [`arn:aws:lambda:${this.region}:${this.account}:function:${CONFIG.lambdaNames.presigner}`],
     }));
     packagerRole.addToPolicy(new iam.PolicyStatement({
       sid: 'ConnectCreateTask',
@@ -236,7 +216,7 @@ export class VoicemailStack extends cdk.Stack {
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         TABLE_NAME:           CONFIG.agentPhoneLookupTable,
         CONNECT_INSTANCE_ID:  CONFIG.connectInstanceId,
-        REGION:               'us-west-2',
+        REGION: this.region,
       },
       description: 'Copies Connect recordings to voicemail bucket and tags with contact attributes',
     });
@@ -252,7 +232,7 @@ export class VoicemailStack extends cdk.Stack {
         DESTINATION_BUCKET:   CONFIG.voicemailBucketName,
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         TRANSCRIPTIONS_FOLDER: CONFIG.transcriptionsFolder,
-        REGION:               'us-west-2',
+        REGION: this.region,
         TRANSCRIBE_ROLE_ARN:  transcribeRole.roleArn,
       },
       description: 'Starts Amazon Transcribe jobs for new voicemail recordings',
@@ -269,7 +249,7 @@ export class VoicemailStack extends cdk.Stack {
         DESTINATION_BUCKET:  CONFIG.voicemailBucketName,
         RECORDINGS_FOLDER:   CONFIG.recordingsFolder,
         SECRET_NAME:         CONFIG.secretName,
-        REGION:              'us-west-2',
+        REGION: this.region,
       },
       description: 'Generates presigned S3 URLs for voicemail audio playback',
     });
@@ -288,7 +268,7 @@ export class VoicemailStack extends cdk.Stack {
         PRESIGNER_FUNCTION:   CONFIG.lambdaNames.presigner,
         CONNECT_INSTANCE_ID:  CONFIG.connectInstanceId,
         TASK_TEMPLATE_ID:     CONFIG.taskTemplateId,
-        REGION:               'us-west-2',
+        REGION: this.region,
       },
       description: 'Creates Connect tasks from completed voicemail transcriptions',
     });
@@ -329,17 +309,17 @@ export class VoicemailStack extends cdk.Stack {
     dumpToS3Lambda.addPermission('AllowS3Invocation', {
       principal: new iam.ServicePrincipal('s3.amazonaws.com'),
       sourceArn: `arn:aws:s3:::${CONFIG.connectRecordingsBucketName}`,
-      sourceAccount: '308665918648',
+      sourceAccount: this.account,
     });
     transcribeLambda.addPermission('AllowS3Invocation', {
       principal: new iam.ServicePrincipal('s3.amazonaws.com'),
       sourceArn: `arn:aws:s3:::${CONFIG.voicemailBucketName}`,
-      sourceAccount: '308665918648',
+      sourceAccount: this.account,
     });
     packagerLambda.addPermission('AllowS3Invocation', {
       principal: new iam.ServicePrincipal('s3.amazonaws.com'),
       sourceArn: `arn:aws:s3:::${CONFIG.voicemailBucketName}`,
-      sourceAccount: '308665918648',
+      sourceAccount: this.account,
     });
 
     // ── 7. CONNECT CONTACT FLOWS ──────────────────────────────────────────────
