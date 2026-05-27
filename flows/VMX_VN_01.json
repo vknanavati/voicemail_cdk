@@ -1,1 +1,143 @@
-{"Version":"2019-10-30","StartAction":"placeholder","Actions":[]}
+{
+  "Version": "2019-10-30",
+  "StartAction": "",
+  "Metadata": {
+    "entryPointPosition": { "x": 40, "y": 40 },
+    "ActionMetadata": {
+      "f308c7fe-d461-47f0-8059-29f744197b95": {
+        "position": { "x": 649.6, "y": -248 },
+        "parameters": { "QueueId": { "useDynamic": true } },
+        "useDynamic": true
+      },
+      "7c544a78-ecc1-4777-8dd2-7f9d22307d8a": {
+        "position": { "x": 1170.4, "y": -243.2 }
+      },
+      "End flow": {
+        "position": { "x": 1414.4, "y": -238.4 },
+        "isFriendlyName": true
+      },
+      "eb2f3314-8d13-47e3-803c-2711ae13433c": {
+        "position": { "x": 418.4, "y": -69.6 },
+        "conditions": [],
+        "conditionMetadata": [
+          {
+            "id": "167e790d-cc8f-43b9-b433-20a470163033",
+            "operator": {
+              "name": "Equals",
+              "value": "Equals",
+              "shortDisplay": "="
+            },
+            "value": "Queue"
+          },
+          {
+            "id": "4c4da170-5f44-4f14-bd60-8ce0d7f16a30",
+            "operator": {
+              "name": "Equals",
+              "value": "Equals",
+              "shortDisplay": "="
+            },
+            "value": "Agent"
+          }
+        ]
+      },
+      "99c94c63-50c2-49a5-86ec-8e3351367c13": {
+        "position": { "x": 174.4, "y": 17.6 }
+      },
+      "set target agent": {
+        "position": { "x": 683.2, "y": 80.8 },
+        "isFriendlyName": true,
+        "parameters": { "AgentId": { "useDynamic": true } },
+        "useDynamic": true
+      }
+    },
+    "Annotations": [
+      {
+        "type": "default",
+        "id": "01a7364f-5f6a-442e-bb33-ef887b1abf37",
+        "content": "in guide it says set dynamically by user defined agent_arn",
+        "actionId": "set target agent",
+        "isFolded": true,
+        "position": { "x": 866.5, "y": 309 },
+        "size": { "height": 295, "width": 300 }
+      }
+    ]
+  },
+  "Actions": [
+    {
+      "Parameters": { "QueueId": "$.Attributes.voicemail_queue" },
+      "Identifier": "f308c7fe-d461-47f0-8059-29f744197b95",
+      "Type": "UpdateContactTargetQueue",
+      "Transitions": {
+        "NextAction": "7c544a78-ecc1-4777-8dd2-7f9d22307d8a",
+        "Errors": [
+          {
+            "NextAction": "7c544a78-ecc1-4777-8dd2-7f9d22307d8a",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    },
+    {
+      "Parameters": {},
+      "Identifier": "7c544a78-ecc1-4777-8dd2-7f9d22307d8a",
+      "Type": "TransferContactToQueue",
+      "Transitions": {
+        "NextAction": "End flow",
+        "Errors": [
+          { "NextAction": "End flow", "ErrorType": "QueueAtCapacity" },
+          { "NextAction": "End flow", "ErrorType": "NoMatchingError" }
+        ]
+      }
+    },
+    {
+      "Parameters": {},
+      "Identifier": "End flow",
+      "Type": "DisconnectParticipant",
+      "Transitions": {}
+    },
+    {
+      "Parameters": { "ComparisonValue": "$.Attributes.DestinationType" },
+      "Identifier": "eb2f3314-8d13-47e3-803c-2711ae13433c",
+      "Type": "Compare",
+      "Transitions": {
+        "NextAction": "f308c7fe-d461-47f0-8059-29f744197b95",
+        "Conditions": [
+          {
+            "NextAction": "f308c7fe-d461-47f0-8059-29f744197b95",
+            "Condition": { "Operator": "Equals", "Operands": ["Queue"] }
+          },
+          {
+            "NextAction": "set target agent",
+            "Condition": { "Operator": "Equals", "Operands": ["Agent"] }
+          }
+        ],
+        "Errors": [
+          {
+            "NextAction": "f308c7fe-d461-47f0-8059-29f744197b95",
+            "ErrorType": "NoMatchingCondition"
+          }
+        ]
+      }
+    },
+    {
+      "Parameters": { "FlowLoggingBehavior": "Enabled" },
+      "Identifier": "99c94c63-50c2-49a5-86ec-8e3351367c13",
+      "Type": "UpdateFlowLoggingBehavior",
+      "Transitions": { "NextAction": "eb2f3314-8d13-47e3-803c-2711ae13433c" }
+    },
+    {
+      "Parameters": { "AgentId": "$.Attributes.voicemail_queue" },
+      "Identifier": "set target agent",
+      "Type": "UpdateContactTargetQueue",
+      "Transitions": {
+        "NextAction": "7c544a78-ecc1-4777-8dd2-7f9d22307d8a",
+        "Errors": [
+          {
+            "NextAction": "7c544a78-ecc1-4777-8dd2-7f9d22307d8a",
+            "ErrorType": "NoMatchingError"
+          }
+        ]
+      }
+    }
+  ]
+}

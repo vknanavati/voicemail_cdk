@@ -328,66 +328,66 @@ export class VoicemailStack extends cdk.Stack {
     // NOTE: CDK Connect flow resources use the *raw JSON string* of the flow.
 
     // Main_Entry_Flow
-    new connect.CfnContactFlow(this, 'MainEntryFlow', {
-      instanceArn: CONFIG.connectInstanceArn,
-      name: 'Main_Entry_Flow',
-      type: 'CONTACT_FLOW',
-      description: 'Main entry flow for incoming calls — routes to queue or voicemail',
+    // new connect.CfnContactFlow(this, 'MainEntryFlow', {
+    //  instanceArn: CONFIG.connectInstanceArn,
+    //  name: 'Main_Entry_Flow',
+    //  type: 'CONTACT_FLOW',
+    //  description: 'Main entry flow for incoming calls — routes to queue or voicemail',
       // Load content from NJH_Main_Entry__1_.json (your customized entry flow)
-      content: JSON.stringify(require('../flows/Main_Entry_Flow.json')),
-    });
+    //  content: JSON.stringify(require('../flows/Main_Entry_Flow.json')),
+   //  });
 
     // Main_Customer_Queue_Flow_1
-    new connect.CfnContactFlow(this, 'MainCustomerQueueFlow', {
-      instanceArn: CONFIG.connectInstanceArn,
-      name: 'Main_Customer_Queue_Flow_1',
-      type: 'CUSTOMER_QUEUE',
-      description: 'Queue flow — plays hold music and offers voicemail option',
-      content: JSON.stringify(require('../flows/Main_Customer_Queue_Flow_1.json')),
-    });
+    // new connect.CfnContactFlow(this, 'MainCustomerQueueFlow', {
+    //  instanceArn: CONFIG.connectInstanceArn,
+    //  name: 'Main_Customer_Queue_Flow_1',
+    //  type: 'CUSTOMER_QUEUE',
+    //  description: 'Queue flow — plays hold music and offers voicemail option',
+    //  content: JSON.stringify(require('../flows/Main_Customer_Queue_Flow_1.json')),
+    //});
 
     // VMX_VN_01 — voicemail recording + task creation flow
-    new connect.CfnContactFlow(this, 'VmxVn01Flow', {
-      instanceArn: CONFIG.connectInstanceArn,
-      name: 'VMX_VN_01',
-      type: 'CONTACT_FLOW',
-      description: 'Voicemail recording flow — records message and triggers Lambda packager',
-      content: JSON.stringify(require('../flows/VMX_VN_01.json')),
-    });
+    // new connect.CfnContactFlow(this, 'VmxVn01Flow', {
+    //   instanceArn: CONFIG.connectInstanceArn,
+    //   name: 'VMX_VN_01',
+    //   type: 'CONTACT_FLOW',
+    //   description: 'Voicemail recording flow — records message and triggers Lambda packager',
+    //   content: JSON.stringify(require('../flows/VMX_VN_01.json')),
+    // });
 
     // ── 8. CONNECT TASK TEMPLATE ──────────────────────────────────────────────
     // CDK's CfnTaskTemplate creates the VoicemailTemplate in Connect.
     // ⚠️  CloudFormation Connect task template support was added in 2023.
     //     If your CDK/CFN version doesn't support it, create this manually once
     //     and paste the ID into CONFIG.taskTemplateId above.
-    new connect.CfnTaskTemplate(this, 'VoicemailTaskTemplate', {
-      instanceArn: CONFIG.connectInstanceArn,
-      name: 'VoicemailTemplate',
-      description: 'Voicemail for Queue Assignment',
-      status: 'ACTIVE',
-      fields: [
-        {
-          id: { name: 'Transcript Of Voicemail' },
-          type: 'TEXT_AREA',
-          description: 'Voicemail transcript text',
-        },
-        {
-          id: { name: 'Click Link To Listen To Voicemail' },
-          type: 'URL',
-          description: 'Presigned S3 URL to play voicemail audio',
-        },
-        {
-          id: { name: 'Customer Number' },
-          type: 'TEXT_AREA',
-          description: "Caller's phone number",
-        },
-        {
-          id: { name: 'Voicemail Created On' },
-          type: 'TEXT_AREA',
-          description: 'Timestamp when voicemail was received',
-        },
-      ],
-    });
+    // new connect.CfnTaskTemplate(this, 'VoicemailTaskTemplate', {
+    //   instanceArn: CONFIG.connectInstanceArn,
+    //   name: 'VoicemailTemplate',
+    //   description: 'Voicemail for Queue Assignment',
+    //   status: 'ACTIVE',
+    //   fields: [
+    //     {
+    //       id: { name: 'Transcript Of Voicemail' },
+    //       type: 'TEXT_AREA',
+    //       description: 'Voicemail transcript text',
+    //     },
+    //     {
+    //       id: { name: 'Click Link To Listen To Voicemail' },
+    //       type: 'URL',
+    //       description: 'Presigned S3 URL to play voicemail audio',
+    //     },
+    //     {
+    //       id: { name: 'Customer Number' },
+    //       type: 'TEXT_AREA',
+    //       description: "Caller's phone number",
+    //     },
+    //     {
+    //       id: { name: 'Voicemail Created On' },
+    //       type: 'TEXT_AREA',
+    //       description: 'Timestamp when voicemail was received',
+    //     },
+    //   ],
+    // });
 
     // ── 9. IAM USER FOR PRESIGNED URLS ────────────────────────────────────────
     // A dedicated IAM user whose long-term credentials are stored in Secrets
