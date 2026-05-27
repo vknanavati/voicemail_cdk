@@ -1,9 +1,0 @@
-{
-  "connectInstanceId": "095fb435-175a-4105-9e33-f22aad321d72",
-  "voicemailBucketName": "vn-demo-voicemail-bucket",
-  "connectRecordingsBucketName": "amazon-connect-REPLACE_WITH_YOUR_HASH",
-  "agentPhoneLookupTable": "AgentPhoneLookup",
-  "secretName": "voicemail-presigner-credentials",
-  "taskTemplateId": "REPLACE_AFTER_FIRST_DEPLOY",
-  "vmx01FlowArn": "arn:aws:connect:us-west-2:308665918648:instance/095fb435-175a-4105-9e33-f22aad321d72/contact-flow/REPLACE"
-}
