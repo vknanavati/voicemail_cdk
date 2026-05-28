@@ -1,14 +1,348 @@
-# Welcome to your CDK TypeScript project
+# Master Demo Voicemail CDK
 
-This is a blank project for CDK development with TypeScript.
+Infrastructure-as-code for the Master Demo Amazon Connect voicemail solution.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Architecture
 
-## Useful commands
+```
+Incoming Call
+    │
+    ▼
+Main_Entry_Flow  ──→  Main_Customer_Queue_Flow_1
+                              │ (caller presses 1 for voicemail)
+                              ▼
+                         VMX_VN_01 (routes voicemail task)
+                              │
+                              ▼
+                    Connect writes WAV to S3
+                    (amazon-connect-<hash> bucket)
+                              │
+                    ┌─────────▼──────────┐
+                    │  dump-to-s3 Lambda │  ← S3 trigger on Connect bucket
+                    └─────────┬──────────┘
+                              │ copies WAV + tags to vn-demo-voicemail-bucket/recordings/
+                              ▼
+                    ┌─────────────────────────┐
+                    │ transcribe-recordings   │  ← S3 trigger on recordings/*.wav
+                    │ Lambda                  │
+                    └─────────┬───────────────┘
+                              │ starts Transcribe job → writes JSON to transcriptions/
+                              ▼
+                    ┌─────────────────────────┐
+                    │    packager Lambda      │  ← S3 trigger on transcriptions/*.json
+                    └─────────┬───────────────┘
+                              │ invokes presigner, creates Connect task
+                              ▼
+                    ┌─────────────────────────┐
+                    │    presigner Lambda     │  ← invoked by packager
+                    │  (uses IAM user creds   │
+                    │   from Secrets Manager) │
+                    └─────────────────────────┘
+                              │
+                              ▼
+                    Agent receives Connect Task
+                    (VoicemailTemplate) with
+                    transcript + audio link
+```
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
-* `npx cdk diff`    compare deployed stack with current state
-* `npx cdk synth`   emits the synthesized CloudFormation template
+---
+
+## What CDK Deploys Automatically
+
+| Resource | Type | Notes |
+|---|---|---|
+| `master-demo-dump-to-s3` | Lambda | Copies recordings to voicemail bucket |
+| `master-demo-transcribe-recordings` | Lambda | Starts Transcribe jobs |
+| `master-demo-presigner` | Lambda | Generates presigned S3 URLs |
+| `master-demo-packager` | Lambda | Creates Connect tasks |
+| `master-demo-dump-to-s3-role` | IAM Role | Least-privilege for dump Lambda |
+| `master-demo-transcribe-recordings-role` | IAM Role | Least-privilege for transcribe Lambda |
+| `master-demo-presigner-role` | IAM Role | Least-privilege for presigner Lambda |
+| `master-demo-packager-role` | IAM Role | Least-privilege for packager Lambda |
+| `master-demo-voicemail-lambda-base` | IAM Managed Policy | Shared CloudWatch Logs policy |
+| `master-demo-presigned-url-user` | IAM User | Long-term credentials for presigned URLs |
+| S3 trigger on Connect recordings bucket | S3 Notification | `.wav` → dump-to-s3 Lambda |
+| S3 trigger on voicemail bucket recordings/ | S3 Notification | `.wav` → transcribe Lambda |
+| S3 trigger on voicemail bucket transcriptions/ | S3 Notification | `.json` → packager Lambda |
+| `Main_Customer_Queue_Flow_1` | Connect Contact Flow | Hold music + voicemail option |
+| `VMX_VN_01` | Connect Contact Flow | Voicemail task routing |
+
+---
+
+## What Must Be Created Manually
+
+The following resources cannot be created by CDK and must be set up manually
+in the AWS console before the solution will work end to end.
+
+### 1. Amazon Connect Instance
+
+CDK does not create Connect instances. You must have an existing instance and
+provide its ID in `cdk.context.json`.
+
+- Connect console → Create instance (if needed)
+- Copy the instance ID from the URL after `/instance/`
+- Add to `cdk.context.json` as `connectInstanceId`
+
+---
+
+### 2. S3 Voicemail Bucket
+
+CDK references this bucket but does not create it. Create it before deploying.
+
+- S3 console → Create bucket
+- Name it something like `your-prefix-voicemail-bucket`
+- Region: `us-west-2`
+- Add to `cdk.context.json` as `voicemailBucketName`
+
+---
+
+### 3. Connect Recordings Bucket Name
+
+Amazon Connect automatically creates an S3 bucket for call recordings when
+you set up data storage. You need to find its name and add it to context.
+
+- Connect console → Data storage → Call recordings
+- Copy the bucket name (starts with `amazon-connect-`)
+- Add to `cdk.context.json` as `connectRecordingsBucketName`
+
+---
+
+### 4. Connect Queues
+
+CDK deploys flows that reference queues by ARN. The queues themselves must
+already exist in your Connect instance.
+
+Required queues:
+- **BasicQueue** — the default queue that comes with every Connect instance
+
+To find the queue ID:
+- Connect console → Queues → BasicQueue → click it → copy ID from URL
+- Add to `cdk.context.json` as `basicQueueId`
+
+---
+
+### 5. Connect Prompts (Audio Files)
+
+The queue flow plays hold music and a beep before recording. These audio
+files must be uploaded to your Connect instance as prompts.
+
+Required prompts:
+- **Beep.wav** — plays before the voicemail recording starts
+- **Music_Jazz_MyTimetoFly_Inst.wav** — hold music while caller waits
+
+To upload prompts:
+1. Connect console → Prompts → Create prompt
+2. Upload your audio file
+3. Copy the prompt ID from the URL after `/prompt/`
+4. Add to `cdk.context.json`:
+   - `beepPromptId`
+   - `musicPromptId`
+
+---
+
+### 6. VoicemailTemplate Task Template
+
+CloudFormation's `AWS::Connect::TaskTemplate` resource has a known bug
+that causes null constraint errors. Create the task template manually.
+
+Steps:
+1. Connect console → Task templates → Create template
+2. Name: `VoicemailTemplate`
+3. Description: `Voicemail for Queue Assignment`
+4. Add these fields (exact names and types required):
+
+| Field Name | Type |
+|---|---|
+| `Transcript Of Voicemail` | Text Area |
+| `Click Link To Listen To Voicemail` | URL |
+| `Customer Number` | Text Area |
+| `Voicemail Created On` | Date |
+
+5. Save the template
+6. Copy the template ID from the browser URL after `/task-templates/update/`
+7. Add to `cdk.context.json` as `taskTemplateId`
+8. Redeploy: `cdk deploy`
+
+> ⚠️ Field names are case-sensitive. They must match exactly what the Lambda
+> code references in `queue_task.py`.
+
+---
+
+### 7. Main Entry Flow
+
+The `Main_Entry_Flow` is intentionally excluded from CDK because it is
+customer-specific — every deployment will have a different IVR menu,
+language options, and routing logic.
+
+Create it manually in Connect:
+1. Connect console → Contact flows → Create contact flow
+2. Build your IVR menu
+3. Add a **Set event hooks** block pointing to `Main_Customer_Queue_Flow_1`
+4. Route callers to the appropriate queues (BasicQueue etc.)
+5. Save and publish
+
+---
+
+### 8. Phone Number
+
+Phone numbers cannot be provisioned via CDK.
+
+1. Connect console → Phone numbers → Claim a number
+2. Choose your country and number type
+3. Assign it to `Main_Entry_Flow`
+
+---
+
+### 9. IAM User Access Key + Secrets Manager
+
+CDK creates the `master-demo-presigned-url-user` IAM user but AWS does not
+allow access keys to be created via CloudFormation for security reasons.
+
+Steps:
+
+**Create the access key:**
+```bash
+aws iam create-access-key --user-name master-demo-presigned-url-user
+```
+Copy the `AccessKeyId` and `SecretAccessKey` from the output immediately —
+AWS only shows the secret key once.
+
+**Store in Secrets Manager:**
+```bash
+aws secretsmanager create-secret \
+  --name voicemail-presigner-credentials \
+  --region us-west-2 \
+  --secret-string '{"presigned_url_account_AK":"AKIA...","presigned_url_account_SAK":"..."}'
+```
+
+If the secret already exists (from a previous deployment):
+```bash
+aws secretsmanager update-secret \
+  --secret-id voicemail-presigner-credentials \
+  --region us-west-2 \
+  --secret-string '{"presigned_url_account_AK":"AKIA...","presigned_url_account_SAK":"..."}'
+```
+
+---
+
+### 10. DynamoDB AgentPhoneLookup Table Data
+
+CDK does not create this table — it must exist before deploying. The table
+stores agent phone number mappings used for agent-specific voicemail routing.
+
+- Table name: `AgentPhoneLookup`
+- Populate with agent data for your Connect instance
+- This is only needed if using agent-directed voicemail (not required for queue voicemail)
+
+---
+
+## Prerequisites
+
+- Node.js 18+
+- AWS CDK v2: `npm install -g aws-cdk`
+- AWS CLI configured with MFA
+- CDK bootstrapped in your account/region
+
+```bash
+cdk bootstrap aws://YOUR_ACCOUNT_ID/us-west-2
+```
+
+---
+
+## cdk.context.json Setup
+
+Copy `cdk.context.template.json` to `cdk.context.json` and fill in all values:
+
+```json
+{
+  "connectInstanceId": "YOUR_CONNECT_INSTANCE_ID",
+  "voicemailBucketName": "YOUR_VOICEMAIL_BUCKET_NAME",
+  "connectRecordingsBucketName": "amazon-connect-YOUR_HASH",
+  "agentPhoneLookupTable": "AgentPhoneLookup",
+  "secretName": "voicemail-presigner-credentials",
+  "taskTemplateId": "REPLACE_AFTER_CREATING_MANUALLY",
+  "vmx01FlowArn": "",
+  "basicQueueId": "YOUR_BASIC_QUEUE_ID",
+  "beepPromptId": "YOUR_BEEP_PROMPT_ID",
+  "musicPromptId": "YOUR_MUSIC_PROMPT_ID"
+}
+```
+
+> ⚠️ Never commit `cdk.context.json` to GitHub — it contains your AWS account
+> and instance IDs. It is already in `.gitignore`. Use `cdk.context.template.json`
+> as the reference for other deployments.
+
+---
+
+## Deployment Steps
+
+### 1. Install dependencies
+```bash
+npm install
+```
+
+### 2. Authenticate with MFA
+```bash
+source ~/mfa-login.sh
+```
+
+### 3. Build and deploy
+```bash
+npm run build
+cdk diff        # review changes
+cdk deploy
+```
+
+### 4. Complete manual steps
+After deploying, complete items 6-10 above that require manual setup.
+
+### 5. Redeploy with task template ID
+After creating the task template manually, update `cdk.context.json` with
+the template ID and redeploy:
+```bash
+cdk deploy
+```
+
+---
+
+## Useful CDK Commands
+
+```bash
+npm run build   # compile TypeScript
+cdk synth       # generate CloudFormation template
+cdk diff        # preview changes before deploying
+cdk deploy      # deploy stack
+cdk destroy     # tear down all CDK-managed resources
+```
+
+---
+
+## Troubleshooting
+
+### MFA token expired
+```bash
+unset AWS_ACCESS_KEY_ID
+unset AWS_SECRET_ACCESS_KEY
+unset AWS_SESSION_TOKEN
+source ~/mfa-login.sh
+```
+
+### Lambda environment variable mismatch
+If a Lambda fails with `Missing required environment variable`, check that
+the variable name in the CDK stack matches exactly what the Python code
+calls `get_env_var()` with.
+
+### S3 trigger not added to Connect bucket
+CDK may not be able to modify the Connect-owned recordings bucket. If the
+`dump-to-s3` trigger is missing:
+1. Lambda console → `master-demo-dump-to-s3` → Configuration → Triggers
+2. Add trigger → S3 → `amazon-connect-<hash>` → suffix `.wav`
+
+### Contact flow deployment fails with InvalidContactFlowException
+- Check that `StartAction` is set in the flow JSON (not empty string)
+- Check that all queue/prompt ARNs in the flow JSON reference your instance
+
+### Task template fields not populating
+Field names in `queue_task.py` must match the task template field names
+exactly including capitalization. Check `build_task_references()` in
+`lambda/packager/queue_task.py`.
