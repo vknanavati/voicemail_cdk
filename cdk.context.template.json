@@ -1,6 +1,5 @@
 {
   "connectInstanceId": "YOUR_CONNECT_INSTANCE_ID",
-  "voicemailBucketName": "YOUR_VOICEMAIL_BUCKET_NAME",
   "connectRecordingsBucketName": "amazon-connect-YOUR_HASH",
   "agentPhoneLookupTable": "AgentPhoneLookup",
   "secretName": "voicemail-presigner-credentials",

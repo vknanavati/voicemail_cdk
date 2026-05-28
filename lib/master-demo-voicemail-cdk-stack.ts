@@ -20,7 +20,6 @@ export class VoicemailStack extends cdk.Stack {
     const CONFIG = {
       connectInstanceId:           this.node.tryGetContext('connectInstanceId'),
       connectInstanceArn:          `arn:aws:connect:${this.region}:${this.account}:instance/${this.node.tryGetContext('connectInstanceId')}`,
-      voicemailBucketName:         this.node.tryGetContext('voicemailBucketName'),
       connectRecordingsBucketName: this.node.tryGetContext('connectRecordingsBucketName'),
       agentPhoneLookupTable:       this.node.tryGetContext('agentPhoneLookupTable') ?? 'AgentPhoneLookup',
       secretName:                  this.node.tryGetContext('secretName') ?? 'voicemail-presigner-credentials',
@@ -46,9 +45,11 @@ export class VoicemailStack extends cdk.Stack {
     // ── 1. S3 BUCKET ──────────────────────────────────────────────────────────
     // Import the existing voicemail bucket rather than creating a new one,
     // since it already exists in your account.
-    const voicemailBucket = s3.Bucket.fromBucketName(
-      this, 'VoicemailBucket', CONFIG.voicemailBucketName
-    );
+    const voicemailBucket = new s3.Bucket(this, 'VoicemailBucket', {
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+    });
 
     // Import the Connect-managed recordings bucket (source of WAV files)
     const connectRecordingsBucket = s3.Bucket.fromBucketName(
@@ -105,8 +106,8 @@ export class VoicemailStack extends cdk.Stack {
       effect: iam.Effect.ALLOW,
       actions: ['s3:PutObject', 's3:PutObjectTagging', 's3:GetObject', 's3:GetObjectTagging'],
       resources: [
-        `arn:aws:s3:::${CONFIG.voicemailBucketName}`,
-        `arn:aws:s3:::${CONFIG.voicemailBucketName}/*`,
+        `arn:aws:s3:::${voicemailBucket.bucketName}`,
+        `arn:aws:s3:::${voicemailBucket.bucketName}/*`,
       ],
     }));
     dumpToS3Role.addToPolicy(new iam.PolicyStatement({
@@ -135,7 +136,7 @@ export class VoicemailStack extends cdk.Stack {
         's3:GetObject',
         's3:GetObjectTagging',
       ],
-      resources: [`arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.recordingsFolder}/*`],
+      resources: [`arn:aws:s3:::${voicemailBucket.bucketName}/${CONFIG.recordingsFolder}/*`],
     }));
     transcribeRole.addToPolicy(new iam.PolicyStatement({
       sid: 'StartTranscribeJob',
@@ -152,7 +153,7 @@ export class VoicemailStack extends cdk.Stack {
       sid: 'TranscribeS3Access',
       effect: iam.Effect.ALLOW,
       actions: ['s3:GetObject', 's3:PutObject'],
-      resources: [`arn:aws:s3:::${CONFIG.voicemailBucketName}/*`],
+      resources: [`arn:aws:s3:::${voicemailBucket.bucketName}/*`],
     }));
 
     // ── 4d. presigner role ────────────────────────────────────────────────────
@@ -188,8 +189,8 @@ export class VoicemailStack extends cdk.Stack {
         's3:PutObjectTagging',
       ],
       resources: [
-        `arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.recordingsFolder}/*`,
-        `arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.transcriptionsFolder}/*`,
+        `arn:aws:s3:::${voicemailBucket.bucketName}/${CONFIG.recordingsFolder}/*`,
+        `arn:aws:s3:::${voicemailBucket.bucketName}/${CONFIG.transcriptionsFolder}/*`,
       ],
     }));
     packagerRole.addToPolicy(new iam.PolicyStatement({
@@ -228,7 +229,7 @@ export class VoicemailStack extends cdk.Stack {
       role: dumpToS3Role,
       environment: {
         SOURCE_BUCKET:        CONFIG.connectRecordingsBucketName,
-        DESTINATION_BUCKET:   CONFIG.voicemailBucketName,
+        DESTINATION_BUCKET:   voicemailBucket.bucketName,
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         TABLE_NAME:           CONFIG.agentPhoneLookupTable,
         CONNECT_INSTANCE_ID:  CONFIG.connectInstanceId,
@@ -245,7 +246,7 @@ export class VoicemailStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/transcribe_recordings')),
       role: transcribeRole,
       environment: {
-        VOICEMAIL_BUCKET:   CONFIG.voicemailBucketName,
+        VOICEMAIL_BUCKET:   voicemailBucket.bucketName,
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         TRANSCRIPTIONS_FOLDER: CONFIG.transcriptionsFolder,
         REGION: this.region,
@@ -262,7 +263,7 @@ export class VoicemailStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/presigner')),
       role: presignerRole,
       environment: {
-        DESTINATION_BUCKET:  CONFIG.voicemailBucketName,
+        DESTINATION_BUCKET:  voicemailBucket.bucketName,
         RECORDINGS_FOLDER:   CONFIG.recordingsFolder,
         SECRET_NAME:         CONFIG.secretName,
         REGION: this.region,
@@ -279,7 +280,7 @@ export class VoicemailStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/packager')),
       role: packagerRole,
       environment: {
-        DESTINATION_BUCKET:   CONFIG.voicemailBucketName,
+        DESTINATION_BUCKET:   voicemailBucket.bucketName,
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         PRESIGNER_FUNCTION:   CONFIG.lambdaNames.presigner,
         CONNECT_INSTANCE_ID:  CONFIG.connectInstanceId,
@@ -329,12 +330,12 @@ export class VoicemailStack extends cdk.Stack {
     });
     transcribeLambda.addPermission('AllowS3Invocation', {
       principal: new iam.ServicePrincipal('s3.amazonaws.com'),
-      sourceArn: `arn:aws:s3:::${CONFIG.voicemailBucketName}`,
+      sourceArn: `arn:aws:s3:::${voicemailBucket.bucketName}`,
       sourceAccount: this.account,
     });
     packagerLambda.addPermission('AllowS3Invocation', {
       principal: new iam.ServicePrincipal('s3.amazonaws.com'),
-      sourceArn: `arn:aws:s3:::${CONFIG.voicemailBucketName}`,
+      sourceArn: `arn:aws:s3:::${voicemailBucket.bucketName}`,
       sourceAccount: this.account,
     });
 
@@ -423,7 +424,7 @@ export class VoicemailStack extends cdk.Stack {
       sid: 'GetVoicemailRecordings',
       effect: iam.Effect.ALLOW,
       actions: ['s3:GetObject'],
-      resources: [`arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.recordingsFolder}/*`],
+      resources: [`arn:aws:s3:::${voicemailBucket.bucketName}/${CONFIG.recordingsFolder}/*`],
     }));
 
     // ── 10. OUTPUTS ────────────────────────────────────────────────────────────
