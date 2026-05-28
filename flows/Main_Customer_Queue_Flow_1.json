@@ -1,6 +1,6 @@
 {
   "Version": "2019-10-30",
-  "StartAction": "",
+  "StartAction": "7ab023ad-db4f-4160-89f5-e18272c28a7d",
   "Metadata": {
     "entryPointPosition": { "x": 40, "y": 40 },
     "ActionMetadata": {
@@ -82,7 +82,7 @@
         },
         "audio": [
           {
-            "id": "arn:aws:connect:us-west-2:308665918648:instance/ccde1e73-2000-4b14-9a86-d00e80ebfe5a/prompt/264f3640-a98b-4c1f-9207-b4629dd36c9b",
+            "id": "MUSIC_PROMPT_ARN_PLACEHOLDER",
             "text": "Music_Jazz_MyTimetoFly_Inst.wav",
             "type": "Prompt"
           }
@@ -189,7 +189,7 @@
     },
     {
       "Parameters": {
-        "PromptId": "arn:aws:connect:us-west-2:308665918648:instance/ccde1e73-2000-4b14-9a86-d00e80ebfe5a/prompt/29c1b911-fd5b-420f-b646-16d07021bbb1"
+        "PromptId": "BEEP_PROMPT_ARN_PLACEHOLDER"
       },
       "Identifier": "a43c0d10-4283-4dd4-b103-080b0f3e1caf",
       "Type": "MessageParticipant",
@@ -236,7 +236,7 @@
           "phoneNumber": "$.CustomerEndpoint.Address",
           "voicemailType": "task",
           "callCenterNumber": "$.SystemEndpoint.Address",
-          "voicemailQueue": "arn:aws:connect:us-west-2:308665918648:instance/ccde1e73-2000-4b14-9a86-d00e80ebfe5a/queue/dd3dfaa2-a7a7-4a38-8ccb-6e7e7dddfe0d",
+          "voicemailQueue": "BASIC_QUEUE_ARN_PLACEHOLDER",
           "DestinationType": "Queue",
           "vmQueueName": "BasicQueue"
         },
@@ -298,7 +298,7 @@
       "Parameters": {
         "Messages": [
           {
-            "PromptId": "arn:aws:connect:us-west-2:308665918648:instance/ccde1e73-2000-4b14-9a86-d00e80ebfe5a/prompt/264f3640-a98b-4c1f-9207-b4629dd36c9b"
+            "PromptId": "MUSIC_PROMPT_ARN_PLACEHOLDER"
           }
         ],
         "InterruptFrequencySeconds": "5",

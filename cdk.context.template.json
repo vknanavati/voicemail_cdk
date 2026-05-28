@@ -5,5 +5,8 @@
   "agentPhoneLookupTable": "AgentPhoneLookup",
   "secretName": "voicemail-presigner-credentials",
   "taskTemplateId": "REPLACE_AFTER_FIRST_DEPLOY",
-  "vmx01FlowArn": "arn:aws:connect:REGION:ACCOUNT_ID:instance/INSTANCE_ID/contact-flow/FLOW_ID"
+  "vmx01FlowArn": "",
+  "basicQueueId": "YOUR_BASIC_QUEUE_ID",
+  "beepPromptId": "YOUR_BEEP_PROMPT_ID",
+  "musicPromptId": "YOUR_MUSIC_PROMPT_ID"
 }

@@ -28,9 +28,9 @@ export class VoicemailStack extends cdk.Stack {
       transcriptionsFolder:        'transcriptions',
       taskTemplateId:              this.node.tryGetContext('taskTemplateId') ?? 'REPLACE_AFTER_FIRST_DEPLOY',
       vmx01FlowArn:                this.node.tryGetContext('vmx01FlowArn') ?? '',
-      basicQueueId: this.node.tryGetContext('basicQueueId'),
-beepPromptId:  this.node.tryGetContext('beepPromptId'),
-musicPromptId: this.node.tryGetContext('musicPromptId'),
+      basicQueueId:                this.node.tryGetContext('basicQueueId'),
+      beepPromptId:                this.node.tryGetContext('beepPromptId'),
+      musicPromptId:               this.node.tryGetContext('musicPromptId'),
       lambdaNames: {
         dumpToS3:   'master-demo-dump-to-s3',
         transcribe: 'master-demo-transcribe-recordings',
@@ -38,6 +38,9 @@ musicPromptId: this.node.tryGetContext('musicPromptId'),
         packager:   'master-demo-packager',
       },
     };
+    const basicQueueArn = `arn:aws:connect:${this.region}:${this.account}:instance/${CONFIG.connectInstanceId}/queue/${CONFIG.basicQueueId}`;
+    const beepPromptArn = `arn:aws:connect:${this.region}:${this.account}:instance/${CONFIG.connectInstanceId}/prompt/${CONFIG.beepPromptId}`;
+    const musicPromptArn = `arn:aws:connect:${this.region}:${this.account}:instance/${CONFIG.connectInstanceId}/prompt/${CONFIG.musicPromptId}`;
 // ─────────────────────────────────────────────────────────────────────────────
 
     // ── 1. S3 BUCKET ──────────────────────────────────────────────────────────
@@ -340,29 +343,35 @@ musicPromptId: this.node.tryGetContext('musicPromptId'),
     //  content: JSON.stringify(require('../flows/Main_Entry_Flow.json')),
    //  });
 
-    // Main_Customer_Queue_Flow_1
-    // new connect.CfnContactFlow(this, 'MainCustomerQueueFlow', {
-    //  instanceArn: CONFIG.connectInstanceArn,
-    //  name: 'Main_Customer_Queue_Flow_1',
-    //  type: 'CUSTOMER_QUEUE',
-    //  description: 'Queue flow — plays hold music and offers voicemail option',
-    //  content: JSON.stringify(require('../flows/Main_Customer_Queue_Flow_1.json')),
-    //});
+    //Main_Customer_Queue_Flow_1
+   const customerQueueFlowContent = JSON.stringify(require('../flows/Main_Customer_Queue_Flow_1.json'))
+  .replace('MUSIC_PROMPT_ARN_PLACEHOLDER', musicPromptArn)
+  .replace('MUSIC_PROMPT_ARN_PLACEHOLDER', musicPromptArn)
+  .replace('BEEP_PROMPT_ARN_PLACEHOLDER', beepPromptArn)
+  .replace('BASIC_QUEUE_ARN_PLACEHOLDER', basicQueueArn);
+
+  new connect.CfnContactFlow(this, 'MainCustomerQueueFlow', {
+    instanceArn: CONFIG.connectInstanceArn,
+    name: 'Main_Customer_Queue_Flow_1',
+    type: 'CUSTOMER_QUEUE',
+    description: 'Queue flow — plays hold music and offers voicemail option',
+    content: customerQueueFlowContent,
+    });
 
     // VMX_VN_01 — voicemail recording + task creation flow
-    // new connect.CfnContactFlow(this, 'VmxVn01Flow', {
-    //   instanceArn: CONFIG.connectInstanceArn,
-    //   name: 'VMX_VN_01',
-    //   type: 'CONTACT_FLOW',
-    //   description: 'Voicemail recording flow — records message and triggers Lambda packager',
-    //   content: JSON.stringify(require('../flows/VMX_VN_01.json')),
-    // });
+    new connect.CfnContactFlow(this, 'VmxVn01Flow', {
+      instanceArn: CONFIG.connectInstanceArn,
+      name: 'VMX_VN_01',
+      type: 'CONTACT_FLOW',
+      description: 'Voicemail recording flow — records message and triggers Lambda packager',
+      content: JSON.stringify(require('../flows/VMX_VN_01.json')),
+    });
 
-    // ── 8. CONNECT TASK TEMPLATE ──────────────────────────────────────────────
-    // CDK's CfnTaskTemplate creates the VoicemailTemplate in Connect.
-    // ⚠️  CloudFormation Connect task template support was added in 2023.
-    //     If your CDK/CFN version doesn't support it, create this manually once
-    //     and paste the ID into CONFIG.taskTemplateId above.
+    // // ── 8. CONNECT TASK TEMPLATE ──────────────────────────────────────────────
+    // // CDK's CfnTaskTemplate creates the VoicemailTemplate in Connect.
+    // // ⚠️  CloudFormation Connect task                                                      template support was added in 2023.
+    // //     If your CDK/CFN version doesn't support it, create this manually once
+    // //     and paste the ID into CONFIG.taskTemplateId above.
     // new connect.CfnTaskTemplate(this, 'VoicemailTaskTemplate', {
     //   instanceArn: CONFIG.connectInstanceArn,
     //   name: 'VoicemailTemplate',
