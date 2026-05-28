@@ -165,7 +165,9 @@ export class VoicemailStack extends cdk.Stack {
       sid: 'ReadSecret',
       effect: iam.Effect.ALLOW,
       actions: ['secretsmanager:GetSecretValue'],
-      resources: [presignerSecret.secretArn],
+      resources: [
+        `arn:aws:secretsmanager:${this.region}:${this.account}:secret:${CONFIG.secretName}-*`
+      ],
     }));
     // Note: The actual S3 presigned URL is generated using the IAM *user*
     // credentials from Secrets Manager, not this role — so no direct S3 perm needed.
