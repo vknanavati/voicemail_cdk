@@ -100,7 +100,6 @@ def connect_queue_task(payload: dict) -> dict:
         response = connect_client.start_task_contact(
             InstanceId=INSTANCE_ID,
             Name=TASK_NAME,
-            PreviousContactId=task_params['ContactId'],
             Description=task_params['Description'],
             TaskTemplateId=task_params['TaskTemplateId'],
             References=task_params['References'],
