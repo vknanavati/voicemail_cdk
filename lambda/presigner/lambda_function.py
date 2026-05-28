@@ -104,6 +104,9 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         logger.info("Processing contact: %s", contact_id)
 
         presigned_url = generate_presigned_url(contact_id, s3_client)
+
+        logger.info("Presigned URL: %s", presigned_url)
+
         response['presigned_url'] = presigned_url
         logger.info("Generated presigned URL")
 
