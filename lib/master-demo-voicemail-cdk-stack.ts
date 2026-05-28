@@ -131,7 +131,10 @@ export class VoicemailStack extends cdk.Stack {
     transcribeRole.addToPolicy(new iam.PolicyStatement({
       sid: 'ReadVoicemailRecordings',
       effect: iam.Effect.ALLOW,
-      actions: ['s3:GetObject'],
+      actions: [
+        's3:GetObject',
+        's3:GetObjectTagging',
+      ],
       resources: [`arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.recordingsFolder}/*`],
     }));
     transcribeRole.addToPolicy(new iam.PolicyStatement({
@@ -176,7 +179,12 @@ export class VoicemailStack extends cdk.Stack {
     packagerRole.addToPolicy(new iam.PolicyStatement({
       sid: 'ReadTranscripts',
       effect: iam.Effect.ALLOW,
-      actions: ['s3:GetObject', 's3:GetObjectTagging'],
+      actions: [
+        's3:GetObject',
+        's3:GetObjectTagging',
+        's3:PutObject',
+        's3:PutObjectTagging',
+      ],
       resources: [
         `arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.recordingsFolder}/*`,
         `arn:aws:s3:::${CONFIG.voicemailBucketName}/${CONFIG.transcriptionsFolder}/*`,
@@ -235,7 +243,7 @@ export class VoicemailStack extends cdk.Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, '../lambda/transcribe_recordings')),
       role: transcribeRole,
       environment: {
-        DESTINATION_BUCKET:   CONFIG.voicemailBucketName,
+        VOICEMAIL_BUCKET:   CONFIG.voicemailBucketName,
         RECORDINGS_FOLDER:    CONFIG.recordingsFolder,
         TRANSCRIPTIONS_FOLDER: CONFIG.transcriptionsFolder,
         REGION: this.region,
